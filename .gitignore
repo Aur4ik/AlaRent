@@ -1,0 +1,40 @@
+# Environment
+.env
+.env.*
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build
+/bin/
+/build/
+/dist/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+*.test
+coverage.out
+
+# Vendor (если будешь использовать)
+vendor/
+
+# Docker
+docker-data/
+
+# Temporary files
+tmp/
+temp/
