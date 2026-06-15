@@ -23,6 +23,18 @@ type UserResponse struct {
 	Role  string `json:"role"`
 }
 
+type CreateApartmentRequest struct {
+	Title        string `json:"title" binding:"required"`
+	Description  string `json:"description"`
+	Price        int    `json:"price" binding:"required,gt=0"`
+	District     string `json:"district" binding:"required"`
+	Address      string `json:"address" binding:"required"`
+	Rooms        int    `json:"rooms" binding:"required,gt=0"`
+	Floor        int    `json:"floor" binding:"required,gte=0"`
+	HasFurniture bool   `json:"has_furniture"`
+	HasWifi      bool   `json:"has_wifi"`
+}
+
 func ToUserResponse(user *models.User) UserResponse {
 	return UserResponse{
 		ID:    user.ID,

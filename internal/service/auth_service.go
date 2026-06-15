@@ -16,9 +16,10 @@ func Register(user *models.User) error {
 	}
 	user.Password = string(hashed)
 
-	if user.Role == "" {
-		user.Role = "tenant"
+	if user.Role != "" && user.Role != models.RoleTenant {
+		return errors.New("only tenant role is allowed on registration")
 	}
+	user.Role = models.RoleTenant
 
 	return repository.CreateUser(user)
 }

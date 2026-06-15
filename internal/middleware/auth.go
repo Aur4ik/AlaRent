@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
+	"github.com/Aur4ik/AlaRent/internal/models"
 	"github.com/Aur4ik/AlaRent/internal/repository"
 )
 
@@ -67,4 +68,37 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("role", user.Role)
 		c.Next()
 	}
+}
+
+func LandlordMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("role")
+		if !exists {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "authentication required",
+			})
+			return
+		}
+
+		roleString, ok := role.(string)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "invalid user role",
+			})
+			return
+		}
+
+		if roleString != models.RoleLandlord {
+			slog.Debug("landlord access denied", "role", roleString)
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "only landlords can perform this action",
+			})
+			return
+		}
+		c.Next()
+	}
+}
+
+func RequireLandlord() gin.HandlerFunc {
+	return LandlordMiddleware()
 }

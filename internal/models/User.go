@@ -2,6 +2,11 @@ package models
 
 import "gorm.io/gorm"
 
+const (
+	RoleTenant   = "tenant"
+	RoleLandlord = "landlord"
+)
+
 type User struct {
 	gorm.Model
 	Name     string `gorm:"not null"`

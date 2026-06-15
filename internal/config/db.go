@@ -29,7 +29,10 @@ func ConnectDB() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	if err := db.AutoMigrate(&models.User{}); err != nil {
+	if err := db.AutoMigrate(
+		&models.User{},
+		&models.Apartment{},
+	); err != nil {
 		log.Fatalf("Auto migration failed: %v", err)
 	}
 
