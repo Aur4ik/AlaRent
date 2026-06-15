@@ -8,3 +8,7 @@
 /tmp/
 vendor/
 go.sum
+.gocache/
+*.exe
+*.test
+coverage.out
