@@ -7,7 +7,7 @@ type RegisterRequest struct {
 	Email    string `json:"email"    binding:"required,email"`
 	Phone    string `json:"phone"    binding:"required"`
 	Password string `json:"password" binding:"required,min=6"`
-	Role     string `json:"role"`
+	Role     string `json:"role"     binding:"omitempty,oneof=tenant landlord"`
 }
 
 type LoginRequest struct {
@@ -33,6 +33,18 @@ type CreateApartmentRequest struct {
 	Floor        int    `json:"floor" binding:"required,gte=0"`
 	HasFurniture bool   `json:"has_furniture"`
 	HasWifi      bool   `json:"has_wifi"`
+}
+
+type UpdateApartmentRequest struct {
+	Title        *string `json:"title"`
+	Description  *string `json:"description"`
+	Price        *int    `json:"price" binding:"omitempty,gt=0"`
+	District     *string `json:"district"`
+	Address      *string `json:"address"`
+	Rooms        *int    `json:"rooms" binding:"omitempty,gt=0"`
+	Floor        *int    `json:"floor" binding:"omitempty,gte=0"`
+	HasFurniture *bool   `json:"has_furniture"`
+	HasWifi      *bool   `json:"has_wifi"`
 }
 
 func ToUserResponse(user *models.User) UserResponse {

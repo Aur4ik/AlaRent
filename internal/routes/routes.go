@@ -23,6 +23,9 @@ func SetupRoutes(r *gin.Engine) {
 	apartaments := r.Group("/apartaments")
 	{
 		apartaments.GET("", handler.GetAllApartments)
+		apartaments.GET("/:id", handler.GetApartmentByID)
 		apartaments.POST("", middleware.AuthMiddleware(), middleware.LandlordMiddleware(), handler.CreateApartament)
+		apartaments.PATCH("/:id", middleware.AuthMiddleware(), middleware.LandlordMiddleware(), handler.UpdateApartment)
+		apartaments.DELETE("/:id", middleware.AuthMiddleware(), middleware.LandlordMiddleware(), handler.DeleteApartment)
 	}
 }
