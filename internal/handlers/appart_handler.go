@@ -24,6 +24,7 @@ func CreateApartament(c *gin.Context) {
 		OwnerID:      uint(userID),
 		Title:        req.Title,
 		Description:  req.Description,
+		Type:         req.Type,
 		Price:        req.Price,
 		District:     req.District,
 		Address:      req.Address,
@@ -31,17 +32,22 @@ func CreateApartament(c *gin.Context) {
 		Floor:        req.Floor,
 		HasFurniture: req.HasFurniture,
 		HasWifi:      req.HasWifi,
+		HasWasher:    req.HasWasher,
 	}
 
-	if err := service.CreateAppartament(&apartment); err != nil {
+	if err := service.CreateApartment(&apartment, req.PhotoURLs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, apartment)
 }
 func GetAllApartments(c *gin.Context) {
+	filter, ok := parseApartmentFilter(c)
+	if !ok {
+		return
+	}
 
-	apartments, err := service.GetAllApartments()
+	apartments, err := service.GetAllApartments(filter)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -115,6 +121,67 @@ func parseApartmentID(c *gin.Context) (uint, bool) {
 	}
 
 	return uint(apartmentID), true
+}
+
+func parseApartmentFilter(c *gin.Context) (dto.ApartmentFilter, bool) {
+	filter := dto.ApartmentFilter{
+		Query:    c.Query("q"),
+		District: c.Query("district"),
+		Type:     c.Query("type"),
+		Sort:     c.Query("sort"),
+	}
+
+	var ok bool
+	if filter.MinPrice, ok = parseOptionalInt(c, "min_price"); !ok {
+		return filter, false
+	}
+	if filter.MaxPrice, ok = parseOptionalInt(c, "max_price"); !ok {
+		return filter, false
+	}
+	if filter.Rooms, ok = parseOptionalInt(c, "rooms"); !ok {
+		return filter, false
+	}
+	if filter.HasFurniture, ok = parseOptionalBool(c, "has_furniture"); !ok {
+		return filter, false
+	}
+	if filter.HasWifi, ok = parseOptionalBool(c, "has_wifi"); !ok {
+		return filter, false
+	}
+	if filter.HasWasher, ok = parseOptionalBool(c, "has_washer"); !ok {
+		return filter, false
+	}
+
+	return filter, true
+}
+
+func parseOptionalInt(c *gin.Context, key string) (int, bool) {
+	raw := c.Query(key)
+	if raw == "" {
+		return 0, true
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid " + key})
+		return 0, false
+	}
+
+	return value, true
+}
+
+func parseOptionalBool(c *gin.Context, key string) (*bool, bool) {
+	raw := c.Query(key)
+	if raw == "" {
+		return nil, true
+	}
+
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid " + key})
+		return nil, false
+	}
+
+	return &value, true
 }
 
 func writeApartmentError(c *gin.Context, err error) {

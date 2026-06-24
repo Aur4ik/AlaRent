@@ -18,8 +18,24 @@ func CreateAppartament(apart *models.Apartment) error {
 	return repository.CreateAppartaments(apart)
 }
 
-func GetAllApartments() ([]models.Apartment, error) {
-	return repository.GetAllApartments()
+func CreateApartment(apart *models.Apartment, photoURLs []string) error {
+	if apart.Type == "" {
+		apart.Type = "apartment"
+	}
+
+	if err := repository.CreateAppartaments(apart); err != nil {
+		return err
+	}
+
+	if len(photoURLs) > 0 {
+		return repository.ReplaceApartmentPhotos(apart.ID, photoURLs)
+	}
+
+	return nil
+}
+
+func GetAllApartments(filter dto.ApartmentFilter) ([]models.Apartment, error) {
+	return repository.GetAllApartments(filter)
 }
 
 func GetApartmentByID(id uint) (*models.Apartment, error) {
@@ -46,6 +62,9 @@ func UpdateApartment(id, userID uint, req dto.UpdateApartmentRequest) (*models.A
 	if req.Description != nil {
 		apartment.Description = *req.Description
 	}
+	if req.Type != nil {
+		apartment.Type = *req.Type
+	}
 	if req.Price != nil {
 		apartment.Price = *req.Price
 	}
@@ -67,12 +86,23 @@ func UpdateApartment(id, userID uint, req dto.UpdateApartmentRequest) (*models.A
 	if req.HasWifi != nil {
 		apartment.HasWifi = *req.HasWifi
 	}
+	if req.HasWasher != nil {
+		apartment.HasWasher = *req.HasWasher
+	}
 
 	if err := repository.UpdateApartment(apartment); err != nil {
 		return nil, err
 	}
+	if req.PhotoURLs != nil {
+		if len(*req.PhotoURLs) > 10 {
+			return nil, errors.New("maximum 10 photos allowed")
+		}
+		if err := repository.ReplaceApartmentPhotos(apartment.ID, *req.PhotoURLs); err != nil {
+			return nil, err
+		}
+	}
 
-	return apartment, nil
+	return GetApartmentByID(apartment.ID)
 }
 
 func DeleteApartment(id, userID uint) error {
