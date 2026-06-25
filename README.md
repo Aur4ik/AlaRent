@@ -1,6 +1,6 @@
 # AlaRent Backend
 
-Backend for AstaRent, a rental housing platform for students and young professionals in Astana.
+Backend for AlaRent, a rental housing platform for students and young professionals in Almaty.
 
 ## Stack
 
@@ -20,7 +20,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_USER=postgres
 DB_PASSWORD=postgres
-DB_NAME=astarent
+DB_NAME=alarent
 ```
 
 Start PostgreSQL, then run:
