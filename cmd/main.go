@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -35,9 +36,8 @@ func main() {
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
-		frontendURL := os.Getenv("FRONTEND_URL")
 
-		if origin == frontendURL || origin == "http://localhost:5173" || origin == "http://127.0.0.1:5173" {
+		if isAllowedOrigin(origin) {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Vary", "Origin")
 			c.Header("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS")
@@ -51,4 +51,21 @@ func corsMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func isAllowedOrigin(origin string) bool {
+	if origin == "" {
+		return false
+	}
+
+	frontendURL := strings.TrimRight(os.Getenv("FRONTEND_URL"), "/")
+	origin = strings.TrimRight(origin, "/")
+
+	if origin == frontendURL ||
+		origin == "http://localhost:5173" ||
+		origin == "http://127.0.0.1:5173" {
+		return true
+	}
+
+	return strings.HasPrefix(origin, "https://") && strings.HasSuffix(origin, ".vercel.app")
 }
