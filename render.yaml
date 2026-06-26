@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: alarent-backend
+    runtime: go
+    buildCommand: go build -o app ./cmd
+    startCommand: ./app
+    envVars:
+      - key: JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
