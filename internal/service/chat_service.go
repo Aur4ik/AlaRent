@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/Aur4ik/AlaRent/internal/models"
 	"github.com/Aur4ik/AlaRent/internal/repository"
@@ -26,7 +27,7 @@ func StartConversation(userID, apartmentID uint) (*models.Conversation, error) {
 
 	conversation, err := repository.FindConversation(userID, apartment.OwnerID, apartment.ID)
 	if err == nil {
-		return conversation, nil
+		return repository.GetConversationByID(conversation.ID)
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
@@ -61,6 +62,11 @@ func SendMessage(userID, conversationID uint, text string) (*models.Message, err
 		return nil, err
 	}
 
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil, errors.New("message text is required")
+	}
+
 	message := &models.Message{
 		ConversationID: conversationID,
 		SenderID:       userID,
@@ -70,7 +76,7 @@ func SendMessage(userID, conversationID uint, text string) (*models.Message, err
 		return nil, err
 	}
 
-	return message, nil
+	return repository.GetMessageByID(message.ID)
 }
 
 func getConversationForUser(userID, conversationID uint) (*models.Conversation, error) {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/Aur4ik/AlaRent/internal/dto"
 	"github.com/Aur4ik/AlaRent/internal/models"
@@ -12,6 +13,7 @@ import (
 var (
 	ErrApartmentNotFound  = errors.New("apartment not found")
 	ErrApartmentForbidden = errors.New("you can manage only your own apartment")
+	ErrApartmentDuplicate = errors.New("you already have the same apartment listing")
 )
 
 func CreateAppartament(apart *models.Apartment) error {
@@ -19,8 +21,14 @@ func CreateAppartament(apart *models.Apartment) error {
 }
 
 func CreateApartment(apart *models.Apartment, photoURLs []string) error {
+	normalizeApartment(apart)
+
 	if apart.Type == "" {
 		apart.Type = "apartment"
+	}
+
+	if err := ensureApartmentIsNotDuplicate(apart, 0); err != nil {
+		return err
 	}
 
 	if err := repository.CreateAppartaments(apart); err != nil {
@@ -90,6 +98,11 @@ func UpdateApartment(id, userID uint, req dto.UpdateApartmentRequest) (*models.A
 		apartment.HasWasher = *req.HasWasher
 	}
 
+	normalizeApartment(apartment)
+	if err := ensureApartmentIsNotDuplicate(apartment, apartment.ID); err != nil {
+		return nil, err
+	}
+
 	if err := repository.UpdateApartment(apartment); err != nil {
 		return nil, err
 	}
@@ -116,4 +129,31 @@ func DeleteApartment(id, userID uint) error {
 	}
 
 	return repository.DeleteApartment(apartment)
+}
+
+func normalizeApartment(apartment *models.Apartment) {
+	apartment.Title = strings.TrimSpace(apartment.Title)
+	apartment.Description = strings.TrimSpace(apartment.Description)
+	apartment.Type = strings.TrimSpace(apartment.Type)
+	apartment.District = strings.TrimSpace(apartment.District)
+	apartment.Address = strings.TrimSpace(apartment.Address)
+}
+
+func ensureApartmentIsNotDuplicate(apartment *models.Apartment, excludeID uint) error {
+	_, err := repository.FindDuplicateApartment(
+		apartment.OwnerID,
+		excludeID,
+		apartment.Title,
+		apartment.Address,
+		apartment.Type,
+		apartment.Rooms,
+		apartment.Floor,
+	)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return ErrApartmentDuplicate
 }

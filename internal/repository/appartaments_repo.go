@@ -12,6 +12,25 @@ import (
 func CreateAppartaments(appart *models.Apartment) error {
 	return config.DB.Create(appart).Error
 }
+
+func FindDuplicateApartment(ownerID uint, apartmentID uint, title, address, apartmentType string, rooms, floor int) (*models.Apartment, error) {
+	var apartment models.Apartment
+
+	query := config.DB.
+		Where("owner_id = ?", ownerID).
+		Where("lower(title) = lower(?)", title).
+		Where("lower(address) = lower(?)", address).
+		Where("type = ?", apartmentType).
+		Where("rooms = ? AND floor = ?", rooms, floor)
+
+	if apartmentID != 0 {
+		query = query.Where("id <> ?", apartmentID)
+	}
+
+	err := query.First(&apartment).Error
+	return &apartment, err
+}
+
 func GetAllApartments(filter dto.ApartmentFilter) ([]models.Apartment, error) {
 	var apartments []models.Apartment
 
@@ -75,7 +94,29 @@ func UpdateApartment(apartment *models.Apartment) error {
 }
 
 func DeleteApartment(apartment *models.Apartment) error {
-	return config.DB.Delete(apartment).Error
+	return config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("apartment_id = ?", apartment.ID).Delete(&models.Favorite{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("apartment_id = ?", apartment.ID).Delete(&models.ApartmentPhoto{}).Error; err != nil {
+			return err
+		}
+
+		var conversations []models.Conversation
+		if err := tx.Where("apartment_id = ?", apartment.ID).Find(&conversations).Error; err != nil {
+			return err
+		}
+		for _, conversation := range conversations {
+			if err := tx.Where("conversation_id = ?", conversation.ID).Delete(&models.Message{}).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("apartment_id = ?", apartment.ID).Delete(&models.Conversation{}).Error; err != nil {
+			return err
+		}
+
+		return tx.Delete(apartment).Error
+	})
 }
 
 func ReplaceApartmentPhotos(apartmentID uint, photoURLs []string) error {

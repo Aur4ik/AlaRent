@@ -56,7 +56,7 @@ type Filters = {
   sort: string;
 };
 
-const API_BASE = "/api";
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 const fallbackApartments: Apartment[] = [
   {
@@ -216,7 +216,11 @@ function App() {
   async function loadFavorites() {
     try {
       const data = await request<unknown[]>("/me/favorites");
-      setFavorites(data.map((item) => normalizeApartment(read(item, "Apartment", "apartment") || item)));
+      setFavorites(
+        data
+          .map((item) => normalizeApartment(read(item, "Apartment", "apartment") || item))
+          .filter((apartment) => apartment.id > 0 && apartment.price > 0),
+      );
     } catch {
       setFavorites([]);
     }
@@ -278,7 +282,8 @@ function App() {
 
   async function createApartment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const photoUrls = String(form.get("photo_urls") || "")
       .split("\n")
       .map((url) => url.trim())
@@ -302,7 +307,7 @@ function App() {
     try {
       await request("/apartaments", { method: "POST", body: JSON.stringify(payload) });
       setNotice("Объявление опубликовано");
-      event.currentTarget.reset();
+      formElement.reset();
       setView("catalog");
       await loadApartments();
     } catch (error) {
@@ -369,10 +374,32 @@ function App() {
     }
   }
 
+  async function deleteApartment(apartment: Apartment) {
+    if (!token) {
+      setNotice("Сначала войди в аккаунт");
+      return;
+    }
+    if (!window.confirm("Удалить это объявление?")) {
+      return;
+    }
+
+    try {
+      await request(`/apartaments/${apartment.id}`, { method: "DELETE" });
+      setSelected(null);
+      setFavorites((items) => items.filter((item) => item.id !== apartment.id));
+      setApartments((items) => items.filter((item) => item.id !== apartment.id));
+      setNotice("Объявление удалено");
+      await loadApartments();
+    } catch (error) {
+      setNotice(getErrorMessage(error));
+    }
+  }
+
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!activeConversation) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const text = String(form.get("text") || "").trim();
     if (!text) return;
 
@@ -381,7 +408,7 @@ function App() {
         method: "POST",
         body: JSON.stringify({ text }),
       });
-      event.currentTarget.reset();
+      formElement.reset();
       await loadMessages(activeConversation);
     } catch (error) {
       setNotice(getErrorMessage(error));
@@ -402,6 +429,30 @@ function App() {
 
   const listing = filteredFallback;
 
+  if (view === "profile") {
+    return (
+      <main>
+        <Header
+          user={user}
+          view={view}
+          setView={setView}
+          logout={logoutLocal}
+        />
+        <Profile
+          user={user}
+          authMode={authMode}
+          setAuthMode={(mode) => {
+            setAuthMode(mode);
+            setNotice("");
+          }}
+          handleAuth={handleAuth}
+          updateProfile={updateProfile}
+          notice={notice}
+        />
+      </main>
+    );
+  }
+
   return (
     <main>
       <Header
@@ -414,7 +465,7 @@ function App() {
       <section className="hero">
         <div className="heroMedia" aria-hidden="true" />
         <div className="heroContent">
-          <p className="eyebrow">AlaRent · аренда жилья в Алмате</p>
+          <p className="eyebrow">AlaRent · аренда жилья в Астане</p>
           <h1>Найди квартиру без шума, лишних звонков и потерянных вариантов.</h1>
           <p className="heroText">
             Минималистичный каталог для студентов и молодых специалистов: поиск, фильтры,
@@ -472,9 +523,6 @@ function App() {
           />
         )}
 
-        {view === "profile" && (
-          <Profile user={user} authMode={authMode} setAuthMode={setAuthMode} handleAuth={handleAuth} updateProfile={updateProfile} />
-        )}
       </div>
 
       {selected && (
@@ -484,6 +532,8 @@ function App() {
           close={() => setSelected(null)}
           toggleFavorite={toggleFavorite}
           openConversation={openConversation}
+          deleteApartment={deleteApartment}
+          user={user}
         />
       )}
     </main>
@@ -601,7 +651,7 @@ function Catalog(props: {
         <div className="checkStack">
           <label><input type="checkbox" checked={props.filters.hasFurniture} onChange={(event) => props.setFilters({ ...props.filters, hasFurniture: event.target.checked })} /> Мебель</label>
           <label><input type="checkbox" checked={props.filters.hasWifi} onChange={(event) => props.setFilters({ ...props.filters, hasWifi: event.target.checked })} /> Wi-Fi</label>
-          <label><input type="checkbox" checked={props.filters.hasWasher} onChange={(event) => props.setFilters({ ...props.filters, hasWasher: event.target.checked })} /> Стиральная машина</label>
+          <label><input type="checkbox" checked={props.filters.hasWasher} onChange={(event) => props.setFilters({ ...props.filters, hasWasher: event.target.checked })} /> Стиралка</label>
         </div>
         <button className="wide" onClick={props.refresh}>Показать результаты</button>
       </aside>
@@ -665,13 +715,17 @@ function ApartmentGrid(props: {
   );
 }
 
-function ApartmentDetails({ apartment, isFavorite, close, toggleFavorite, openConversation }: {
+function ApartmentDetails({ apartment, isFavorite, close, toggleFavorite, openConversation, deleteApartment, user }: {
   apartment: Apartment;
   isFavorite: boolean;
   close: () => void;
   toggleFavorite: (apartment: Apartment) => void;
   openConversation: (apartment: Apartment) => void;
+  deleteApartment: (apartment: Apartment) => void;
+  user: User | null;
 }) {
+  const canManage = user?.role === "landlord" && user.id === apartment.ownerId;
+
   return (
     <div className="modalLayer" onClick={close}>
       <section className="details" onClick={(event) => event.stopPropagation()}>
@@ -690,10 +744,15 @@ function ApartmentDetails({ apartment, isFavorite, close, toggleFavorite, openCo
             <span>{apartment.hasWasher ? "Стиральная машина" : "Без стиральной машины"}</span>
           </div>
           <div className="actions">
-            <button onClick={() => openConversation(apartment)}>Связаться</button>
+            {!canManage && <button onClick={() => openConversation(apartment)}>Связаться</button>}
             <button className="secondary" onClick={() => toggleFavorite(apartment)}>
               {isFavorite ? "Убрать из избранного" : "Сохранить"}
             </button>
+            {canManage && (
+              <button className="danger" onClick={() => deleteApartment(apartment)}>
+                Удалить объявление
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -783,52 +842,88 @@ function Chats(props: {
   );
 }
 
-function Profile({ user, authMode, setAuthMode, handleAuth, updateProfile }: {
+function Profile({ user, authMode, setAuthMode, handleAuth, updateProfile, notice }: {
   user: User | null;
   authMode: "login" | "register";
   setAuthMode: (mode: "login" | "register") => void;
   handleAuth: (event: FormEvent<HTMLFormElement>) => void;
   updateProfile: (event: FormEvent<HTMLFormElement>) => void;
+  notice: string;
 }) {
   if (!user) {
     return (
-      <section className="authPanel">
-        <div>
-          <h2>{authMode === "login" ? "Вход" : "Регистрация"}</h2>
-          <p>Один аккаунт для поиска жилья, избранного и чатов.</p>
+      <section className="authPage">
+        <div className="authVisual">
+          <p className="eyebrow">AlaRent аккаунт</p>
+          <h1>{authMode === "login" ? "Вернись к сохраненным вариантам." : "Создай профиль для аренды."}</h1>
+          <p>
+            Один аккаунт для поиска жилья, публикации объявлений, избранного и быстрых
+            диалогов с арендодателями.
+          </p>
+          <div className="authBenefits">
+            <span>Избранное</span>
+            <span>Чаты</span>
+            <span>Объявления</span>
+          </div>
         </div>
-        <form onSubmit={handleAuth}>
-          {authMode === "register" && (
-            <>
-              <input name="name" placeholder="Имя" required />
-              <input name="phone" placeholder="Телефон" required />
-              <select name="role" defaultValue="tenant">
-                <option value="tenant">Ищу жилье</option>
-                <option value="landlord">Сдаю жилье</option>
-              </select>
-            </>
-          )}
-          <input name="email" placeholder="Email" type="email" required />
-          <input name="password" placeholder="Пароль" type="password" required />
-          <button>{authMode === "login" ? "Войти" : "Создать аккаунт"}</button>
-        </form>
-        <button className="linkButton" onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}>
-          {authMode === "login" ? "Нужна регистрация" : "Уже есть аккаунт"}
-        </button>
+
+        <div className="authCard">
+          <div className="authTabs">
+            <button className={authMode === "login" ? "active" : ""} onClick={() => setAuthMode("login")}>
+              Вход
+            </button>
+            <button className={authMode === "register" ? "active" : ""} onClick={() => setAuthMode("register")}>
+              Регистрация
+            </button>
+          </div>
+
+          <div className="authCardHead">
+            <h2>{authMode === "login" ? "Войти в аккаунт" : "Новый аккаунт"}</h2>
+            <p>{authMode === "login" ? "Продолжи поиск с того места, где остановился." : "Выбери роль и заполни базовые данные."}</p>
+          </div>
+
+          {notice && <div className="authNotice">{notice}</div>}
+
+          <form className="authForm" onSubmit={handleAuth}>
+            {authMode === "register" && (
+              <>
+                <input name="name" placeholder="Имя" required />
+                <input name="phone" placeholder="Телефон" required />
+                <select name="role" defaultValue="tenant">
+                  <option value="tenant">Ищу жилье</option>
+                  <option value="landlord">Сдаю жилье</option>
+                </select>
+              </>
+            )}
+            <input name="email" placeholder="Email" type="email" required />
+            <input name="password" placeholder="Пароль" type="password" required />
+            <button>{authMode === "login" ? "Войти" : "Создать аккаунт"}</button>
+          </form>
+
+          <button className="authSwitch" onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}>
+            {authMode === "login" ? "Нет аккаунта? Зарегистрироваться" : "Уже есть аккаунт? Войти"}
+          </button>
+        </div>
       </section>
     );
   }
 
   return (
-    <section className="panel">
-      <h2>Профиль</h2>
-      <p>{user.role === "landlord" ? "Арендодатель" : "Арендатор"} · {user.email}</p>
-      <form className="formGrid" onSubmit={updateProfile}>
+    <section className="profilePage">
+      <div className="profileHero">
+        <div className="avatar">{user.name.slice(0, 1).toUpperCase()}</div>
+        <div>
+          <p className="eyebrow">{user.role === "landlord" ? "Арендодатель" : "Арендатор"}</p>
+          <h1>{user.name}</h1>
+          <p>{user.email}</p>
+        </div>
+      </div>
+      <form className="profileForm" onSubmit={updateProfile}>
         <input name="name" defaultValue={user.name} placeholder="Имя" />
         <input name="phone" defaultValue={user.phone} placeholder="Телефон" />
         <input name="avatar_url" defaultValue={user.avatarUrl || ""} placeholder="Фото профиля URL" />
         <textarea name="bio" defaultValue={user.bio || ""} placeholder="О себе" />
-        <button className="wide">Сохранить</button>
+        <button className="wide">Сохранить профиль</button>
       </form>
     </section>
   );
@@ -924,7 +1019,7 @@ function read(raw: unknown, ...keys: string[]) {
 
 function readStoredUser() {
   try {
-    const raw = localStorage.getItem("alarentuser");
+    const raw = localStorage.getItem("alarent_user");
     return raw ? normalizeUser(JSON.parse(raw)) : null;
   } catch {
     return null;

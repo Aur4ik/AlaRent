@@ -1,8 +1,11 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/Aur4ik/AlaRent/internal/config"
 	"github.com/Aur4ik/AlaRent/internal/models"
+	"gorm.io/gorm"
 )
 
 func FindConversation(tenantID, landlordID, apartmentID uint) (*models.Conversation, error) {
@@ -21,6 +24,7 @@ func GetConversationByID(id uint) (*models.Conversation, error) {
 	var conversation models.Conversation
 	err := config.DB.
 		Preload("Apartment").
+		Preload("Apartment.Photos").
 		Preload("Tenant").
 		Preload("Landlord").
 		First(&conversation, id).Error
@@ -31,6 +35,7 @@ func GetUserConversations(userID uint) ([]models.Conversation, error) {
 	var conversations []models.Conversation
 	err := config.DB.
 		Preload("Apartment").
+		Preload("Apartment.Photos").
 		Preload("Tenant").
 		Preload("Landlord").
 		Where("tenant_id = ? OR landlord_id = ?", userID, userID).
@@ -40,7 +45,21 @@ func GetUserConversations(userID uint) ([]models.Conversation, error) {
 }
 
 func CreateMessage(message *models.Message) error {
-	return config.DB.Create(message).Error
+	return config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(message).Error; err != nil {
+			return err
+		}
+
+		return tx.Model(&models.Conversation{}).
+			Where("id = ?", message.ConversationID).
+			Update("updated_at", time.Now()).Error
+	})
+}
+
+func GetMessageByID(id uint) (*models.Message, error) {
+	var message models.Message
+	err := config.DB.Preload("Sender").First(&message, id).Error
+	return &message, err
 }
 
 func GetConversationMessages(conversationID uint) ([]models.Message, error) {

@@ -36,7 +36,7 @@ func CreateApartament(c *gin.Context) {
 	}
 
 	if err := service.CreateApartment(&apartment, req.PhotoURLs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeApartmentError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, apartment)
@@ -190,6 +190,8 @@ func writeApartmentError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrApartmentForbidden):
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrApartmentDuplicate):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	}
