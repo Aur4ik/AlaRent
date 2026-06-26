@@ -138,6 +138,7 @@ function App() {
   const [user, setUser] = useState<User | null>(() => readStoredUser());
   const [token, setToken] = useState(() => localStorage.getItem("alarent_access") || "");
   const [notice, setNotice] = useState("Готово к поиску жилья в Астане");
+  const [authNotice, setAuthNotice] = useState("");
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [loading, setLoading] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -179,10 +180,20 @@ function App() {
     }
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
-    const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    } catch {
+      throw new Error("Не удалось подключиться к backend. Проверь VITE_API_URL и CORS.");
+    }
+
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.error || "Запрос не выполнен");
+      const fallback =
+        API_BASE === "/api"
+          ? "Frontend собран без VITE_API_URL. Укажи backend URL в Vercel и сделай redeploy."
+          : `Backend вернул ошибку ${response.status}`;
+      throw new Error(String(read(data, "error", "message") || fallback));
     }
     return data as T;
   }
@@ -247,6 +258,7 @@ function App() {
 
   async function handleAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setAuthNotice("");
     const form = new FormData(event.currentTarget);
     const payload = Object.fromEntries(form.entries());
     const path = authMode === "login" ? "/auth/login" : "/auth/register";
@@ -258,7 +270,7 @@ function App() {
           body: JSON.stringify(payload),
         });
         setAuthMode("login");
-        setNotice("Аккаунт создан, теперь войди");
+        setAuthNotice("Аккаунт создан, теперь войди");
         return;
       }
 
@@ -275,8 +287,9 @@ function App() {
       setToken(access);
       setUser(nextUser);
       setNotice(`Добро пожаловать, ${nextUser.name}`);
+      setAuthNotice("");
     } catch (error) {
-      setNotice(getErrorMessage(error));
+      setAuthNotice(getErrorMessage(error));
     }
   }
 
@@ -443,11 +456,11 @@ function App() {
           authMode={authMode}
           setAuthMode={(mode) => {
             setAuthMode(mode);
-            setNotice("");
+            setAuthNotice("");
           }}
           handleAuth={handleAuth}
           updateProfile={updateProfile}
-          notice={notice}
+          notice={authNotice}
         />
       </main>
     );
