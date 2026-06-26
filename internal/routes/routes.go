@@ -8,6 +8,13 @@ import (
 )
 
 func SetupRoutes(r *gin.Engine) {
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok", "service": "AlaRent API"})
+	})
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	auth := r.Group("/auth")
 	{
 		auth.POST("/register", handler.Register)
@@ -28,15 +35,17 @@ func SetupRoutes(r *gin.Engine) {
 		protected.GET("/ws/conversations/:id", handler.ConversationWebSocket)
 	}
 
-	apartaments := r.Group("/apartaments")
-	{
-		apartaments.GET("", handler.GetAllApartments)
-		apartaments.GET("/:id", handler.GetApartmentByID)
-		apartaments.POST("", middleware.AuthMiddleware(), middleware.LandlordMiddleware(), handler.CreateApartament)
-		apartaments.PATCH("/:id", middleware.AuthMiddleware(), middleware.LandlordMiddleware(), handler.UpdateApartment)
-		apartaments.DELETE("/:id", middleware.AuthMiddleware(), middleware.LandlordMiddleware(), handler.DeleteApartment)
-		apartaments.POST("/:id/favorite", middleware.AuthMiddleware(), handler.AddFavorite)
-		apartaments.DELETE("/:id/favorite", middleware.AuthMiddleware(), handler.RemoveFavorite)
-		apartaments.POST("/:id/conversation", middleware.AuthMiddleware(), handler.StartConversation)
-	}
+	registerApartmentRoutes(r.Group("/apartaments"))
+	registerApartmentRoutes(r.Group("/apartments"))
+}
+
+func registerApartmentRoutes(apartments *gin.RouterGroup) {
+	apartments.GET("", handler.GetAllApartments)
+	apartments.GET("/:id", handler.GetApartmentByID)
+	apartments.POST("", middleware.AuthMiddleware(), middleware.LandlordMiddleware(), handler.CreateApartament)
+	apartments.PATCH("/:id", middleware.AuthMiddleware(), middleware.LandlordMiddleware(), handler.UpdateApartment)
+	apartments.DELETE("/:id", middleware.AuthMiddleware(), middleware.LandlordMiddleware(), handler.DeleteApartment)
+	apartments.POST("/:id/favorite", middleware.AuthMiddleware(), handler.AddFavorite)
+	apartments.DELETE("/:id/favorite", middleware.AuthMiddleware(), handler.RemoveFavorite)
+	apartments.POST("/:id/conversation", middleware.AuthMiddleware(), handler.StartConversation)
 }
